@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import Card from '../components/Card';
-import { Package, DollarSign, TrendingUp, AlertTriangle, Plus, Trash2, Edit2, X } from 'lucide-react';
+import { Package, DollarSign, TrendingUp, AlertTriangle, Plus, Trash2, Edit2, X, CreditCard } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -16,7 +16,7 @@ const ShopDashboard = () => {
   const token = localStorage.getItem('token');
   const authHeader = { headers: { Authorization: `Bearer ${token}` } };
   
-  const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity: '', image_url: '' });
+   const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity: '', image_url: '', category: 'General' });
 
   useEffect(() => {
     fetchShopData();
@@ -29,10 +29,10 @@ const ShopDashboard = () => {
       setShop(shopData);
       
       if (shopData) {
-        const prodRes = await axios.get(`http://localhost:5000/api/products/shop/${shopData._id}`);
+        const prodRes = await axios.get(`http://localhost:5000/api/products/shop/${shopData.id}`);
         setProducts(prodRes.data);
         
-        const salesRes = await axios.get(`http://localhost:5000/api/sales/shop/${shopData._id}`);
+        const salesRes = await axios.get(`http://localhost:5000/api/sales/shop/${shopData.id}`);
         setSales(salesRes.data);
       }
     } catch (err) {
@@ -43,10 +43,21 @@ const ShopDashboard = () => {
   const toggleShopStatus = async () => {
     try {
       const newStatus = shop.status === 'open' ? 'closed' : 'open';
-      const res = await axios.put(`http://localhost:5000/api/shops/${shop._id}`, { status: newStatus }, authHeader);
+      const res = await axios.put(`http://localhost:5000/api/shops/${shop.id}`, { status: newStatus }, authHeader);
       setShop(res.data);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handlePayment = async () => {
+    if (!shop.total_balance || shop.total_balance <= 0) return;
+    try {
+        await axios.post(`http://localhost:5000/api/shops/pay/${shop.id}`, { amount: shop.total_balance }, authHeader);
+        fetchShopData();
+        alert('Rent paid successfully!');
+    } catch (err) {
+        alert('Payment failed: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -56,9 +67,9 @@ const ShopDashboard = () => {
       if (editingId) {
         await axios.put(`http://localhost:5000/api/products/${editingId}`, newProduct, authHeader);
       } else {
-        await axios.post('http://localhost:5000/api/products', { ...newProduct, shop_id: shop._id }, authHeader);
+        await axios.post('http://localhost:5000/api/products', { ...newProduct, shop_id: shop.id }, authHeader);
       }
-      setNewProduct({ name: '', price: '', quantity: '', image_url: '' });
+      setNewProduct({ name: '', price: '', quantity: '', image_url: '', category: 'General' });
       setEditingId(null);
       fetchShopData();
     } catch (err) {
@@ -67,18 +78,19 @@ const ShopDashboard = () => {
   };
 
   const handleEditInit = (product) => {
-    setEditingId(product._id);
+    setEditingId(product.id);
     setNewProduct({
         name: product.name,
         price: product.price,
         quantity: product.quantity,
-        image_url: product.image_url || ''
+        image_url: product.image_url || '',
+        category: product.category || 'General'
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setNewProduct({ name: '', price: '', quantity: '', image_url: '' });
+    setNewProduct({ name: '', price: '', quantity: '', image_url: '', category: 'General' });
   };
 
   const handleDeleteProduct = async (id) => {
@@ -94,7 +106,7 @@ const ShopDashboard = () => {
   // Aggregating Sales Data for Chart
   const salesByProduct = {};
   sales.forEach(sale => {
-    const pName = sale.product_id?.name || 'Unknown';
+    const pName = sale.Product?.name || 'Unknown';
     salesByProduct[pName] = (salesByProduct[pName] || 0) + sale.quantity_sold;
   });
 
@@ -110,9 +122,10 @@ const ShopDashboard = () => {
   };
 
   const lowStock = products.filter(p => p.quantity < 5);
-  const totalRevenue = sales.reduce((acc, sale) => acc + (sale.quantity_sold * (sale.product_id?.price || 0)), 0);
-
   if (!shop) return <div className="text-center p-8 mt-10">No shop registered to this owner.</div>;
+
+  const totalRevenue = sales.reduce((acc, sale) => acc + (sale.quantity_sold * (sale.Product?.price || 0)), 0);
+  const performanceBonus = totalRevenue * (shop.performance_rate || 0.05);
 
   return (
     <div className="space-y-6">
@@ -142,9 +155,19 @@ const ShopDashboard = () => {
           <div className="p-3 bg-purple-100 rounded-lg mr-4"><TrendingUp className="h-6 w-6 text-purple-600" /></div>
           <div><p className="text-sm text-gray-500">Total Sales</p><p className="text-xl font-bold text-gray-800">{sales.length}</p></div>
         </Card>
-        <Card className="p-4 flex items-center">
-          <div className="p-3 bg-yellow-100 rounded-lg mr-4"><AlertTriangle className="h-6 w-6 text-yellow-600" /></div>
-          <div><p className="text-sm text-gray-500">Low Stock Items</p><p className="text-xl font-bold text-gray-800">{lowStock.length}</p></div>
+        <Card className="p-4 flex items-center relative overflow-hidden">
+          {shop.total_balance > 0 && <div className="absolute top-0 right-0 h-16 w-16 bg-red-500/10 rotate-45 translate-x-8 -translate-y-8"></div>}
+          <div className="p-3 bg-red-100 rounded-lg mr-4"><CreditCard className="h-6 w-6 text-red-600" /></div>
+          <div className="flex-1">
+            <p className="text-sm text-gray-500">Rent Balance</p>
+            <p className="text-xl font-bold text-red-600">₹{(shop.total_balance || 0).toLocaleString('en-IN')}</p>
+            <div className="text-[9px] text-gray-400 font-medium mt-1 uppercase">
+                Base: ₹{shop.rent_amount} + Performance Bonus: ₹{performanceBonus.toFixed(0)}
+            </div>
+          </div>
+          {shop.total_balance > 0 && (
+            <button onClick={handlePayment} className="text-[10px] bg-red-600 text-white px-2 py-1.5 rounded font-bold hover:bg-red-700 transition shadow-sm z-10">PAY NOW</button>
+          )}
         </Card>
       </div>
 
@@ -152,15 +175,23 @@ const ShopDashboard = () => {
         <Card className="p-6 lg:col-span-2">
           <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><Package className="h-5 w-5 mr-2 text-blue-500" /> Manage Products</h2>
           
-          <form onSubmit={handleSubmit} className={`grid grid-cols-2 md:grid-cols-5 gap-3 mb-6 p-4 rounded-lg border transition-colors ${editingId ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-100'}`}>
-            <input type="text" placeholder="Product Name" required className="col-span-2 md:col-span-1 px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
+          <form onSubmit={handleSubmit} className={`grid grid-cols-2 md:grid-cols-6 gap-3 mb-6 p-4 rounded-xl border transition-all ${editingId ? 'bg-indigo-50 border-indigo-200 shadow-inner' : 'bg-gray-50 border-gray-100'}`}>
+            <input type="text" placeholder="Name" required className="col-span-2 md:col-span-1 px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.name} onChange={e => setNewProduct({...newProduct, name: e.target.value})} />
+            <select required className="px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm bg-white" value={newProduct.category} onChange={e => setNewProduct({...newProduct, category: e.target.value})}>
+                <option value="General">Category</option>
+                <option value="Electronics">Electronics</option>
+                <option value="Fashion">Fashion</option>
+                <option value="Groceries">Groceries</option>
+                <option value="Books">Books</option>
+                <option value="Food">Food</option>
+            </select>
             <input type="number" placeholder="Price" required className="px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} />
             <input type="number" placeholder="Qty" required className="px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.quantity} onChange={e => setNewProduct({...newProduct, quantity: e.target.value})} />
             <input type="url" placeholder="Image URL" className="px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.image_url} onChange={e => setNewProduct({...newProduct, image_url: e.target.value})} />
             
             <div className="col-span-2 md:col-span-1 flex gap-2">
-                <button type="submit" className={`flex-1 text-white font-medium rounded flex items-center justify-center py-2 transition ${editingId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                    {editingId ? <><Edit2 className="h-4 w-4" /></> : <><Plus className="h-4 w-4 mr-1" /> Add</>}
+                <button type="submit" className={`flex-1 text-white font-bold rounded flex items-center justify-center py-2 transition shadow-sm ${editingId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                    {editingId ? <CheckCircle className="h-5 w-5" /> : <><Plus className="h-4 w-4 mr-1" /> Add</>}
                 </button>
                 {editingId && (
                     <button type="button" onClick={cancelEdit} className="bg-gray-300 hover:bg-gray-400 text-gray-700 rounded px-3 py-2 transition flex items-center justify-center">
@@ -182,7 +213,7 @@ const ShopDashboard = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {products.map(p => (
-                  <tr key={p._id} className="hover:bg-gray-50 flex-grow">
+                  <tr key={p.id} className="hover:bg-gray-50 flex-grow">
                     <td className="py-2 text-gray-800 font-medium">{p.name}</td>
                     <td className="py-2 text-gray-600">₹{p.price.toLocaleString('en-IN')}</td>
                     <td className="py-2">
@@ -190,7 +221,7 @@ const ShopDashboard = () => {
                     </td>
                     <td className="py-2 flex justify-end gap-2">
                       <button onClick={() => handleEditInit(p)} className="text-blue-500 hover:text-blue-700 p-1"><Edit2 className="h-4 w-4" /></button>
-                      <button onClick={() => handleDeleteProduct(p._id)} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="h-4 w-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -212,7 +243,7 @@ const ShopDashboard = () => {
             {lowStock.length > 0 ? (
               <ul className="divide-y">
                 {lowStock.map(p => (
-                  <li key={p._id} className="py-2 flex justify-between items-center text-sm">
+                  <li key={p.id} className="py-2 flex justify-between items-center text-sm">
                     <span className="font-medium text-gray-700">{p.name}</span>
                     <span className="text-red-600 font-semibold">{p.quantity} left</span>
                   </li>

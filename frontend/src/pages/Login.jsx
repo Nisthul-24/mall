@@ -125,13 +125,21 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="mt-6 text-center">
+        <div className="mt-6 flex flex-col items-center gap-3">
             <button 
                 type="button" 
                 onClick={() => { setIsRegister(!isRegister); setError(''); setSuccess(''); }}
                 className="text-sm text-gray-500 hover:text-blue-600 transition-colors font-medium"
             >
                 {isRegister ? 'Already registered? Sign In' : "Don't have an account? Sign Up"}
+            </button>
+            
+            <button 
+                type="button" 
+                onClick={() => navigate('/')}
+                className="text-sm font-bold text-blue-600 hover:text-blue-700 bg-blue-50 px-6 py-2 rounded-xl transition"
+            >
+                Browse Store as Guest
             </button>
         </div>
 

@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Card from '../components/Card';
-import { Store, CheckCircle, AlertCircle, DollarSign, Trash2, Plus } from 'lucide-react';
+import { Store, CheckCircle, AlertCircle, DollarSign, Trash2, Plus, PieChart, Layout } from 'lucide-react';
+import AdminAnalytics from '../components/AdminAnalytics';
 
 const AdminDashboard = () => {
   const [shops, setShops] = useState([]);
+  const [activeTab, setActiveTab] = useState('shops');
   const [isCreating, setIsCreating] = useState(false);
   const [newShop, setNewShop] = useState({
       shopName: '',
@@ -31,15 +33,13 @@ const AdminDashboard = () => {
       console.error(err);
     }
   };
-
-  const toggleRentStatus = async (shopId, currentStatus) => {
+  const handlePayment = async (shopId, amount) => {
     try {
-      const newStatus = currentStatus === 'Paid' ? 'Pending' : 'Paid';
-      await axios.put(`http://localhost:5000/api/shops/${shopId}`, { rent_status: newStatus }, authHeader);
+      await axios.post(`http://localhost:5000/api/shops/pay/${shopId}`, { amount }, authHeader);
       fetchShops(); 
     } catch (err) {
       if(err.response?.status === 401 || err.response?.status === 403) navigate('/login');
-      console.error(err);
+      alert('Payment failed: ' + (err.response?.data?.message || err.message));
     }
   };
 
@@ -56,17 +56,13 @@ const AdminDashboard = () => {
   const handleCreateShop = async (e) => {
       e.preventDefault();
       try {
-          // 1. Create the Shop Owner User
           const userRes = await axios.post('http://localhost:5000/api/auth/register', {
               name: newShop.ownerName,
               email: newShop.ownerEmail,
               password: newShop.password,
               role: 'shop_owner'
           });
-
-          const createdUserId = userRes.data.user._id;
-
-          // 2. Create the Shop, linking the new owner
+          const createdUserId = userRes.data.user.id;
           await axios.post('http://localhost:5000/api/shops', {
               name: newShop.shopName,
               owner_id: createdUserId,
@@ -74,23 +70,18 @@ const AdminDashboard = () => {
               status: 'open',
               rent_status: 'Pending'
           }, authHeader);
-
-          // Success
           setIsCreating(false);
           setNewShop({ shopName: '', ownerName: '', ownerEmail: '', password: '', rentAmount: '' });
           fetchShops();
-
       } catch (err) {
           alert('Failed to create shop: ' + (err.response?.data?.message || err.message));
-          console.error(err);
       }
   };
 
   const totalShops = shops.length;
   const activeShops = shops.filter(s => s.status === 'open').length;
-  const rentCollected = shops.filter(s => s.rent_status === 'Paid').reduce((acc, s) => acc + s.rent_amount, 0);
-  const pendingRentShops = shops.filter(s => s.rent_status === 'Pending');
-
+  const totalArrears = shops.reduce((acc, s) => acc + (s.total_balance || 0), 0);
+  const pendingRentShops = shops.filter(s => (s.total_balance || 0) > 0);
   const topShops = [...shops].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 3);
 
   return (
@@ -100,46 +91,67 @@ const AdminDashboard = () => {
             <h1 className="text-2xl font-bold text-gray-800">Mall Administration</h1>
             <p className="text-gray-500">Overview of all mall operations and shops.</p>
         </div>
-        <button 
-            onClick={() => setIsCreating(!isCreating)}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
-        >
-            <Plus className="h-5 w-5 mr-1" /> {isCreating ? 'Cancel Creation' : 'Register New Shop'}
-        </button>
+        <div className="flex gap-2">
+            <div className="bg-gray-100 p-1 rounded-lg flex mr-4">
+                <button 
+                    onClick={() => setActiveTab('shops')}
+                    className={`flex items-center px-4 py-2 rounded-md font-medium transition ${activeTab === 'shops' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                    <Layout className="h-4 w-4 mr-2" /> Shops
+                </button>
+                <button 
+                    onClick={() => setActiveTab('analytics')}
+                    className={`flex items-center px-4 py-2 rounded-md font-medium transition ${activeTab === 'analytics' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}
+                >
+                    <PieChart className="h-4 w-4 mr-2" /> Analytics
+                </button>
+            </div>
+            <button 
+                onClick={() => setIsCreating(!isCreating)}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+            >
+                <Plus className="h-5 w-5 mr-1" /> {isCreating ? 'Cancel Creation' : 'Register New Shop'}
+            </button>
+        </div>
       </div>
 
-      {isCreating && (
-          <Card className="p-6 border-l-4 border-blue-500">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">Register New Shop & Owner</h2>
-              <form onSubmit={handleCreateShop} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">Shop Name</label>
-                      <input type="text" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.shopName} onChange={e => setNewShop({...newShop, shopName: e.target.value})} />
-                  </div>
-                  <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">Monthly Rent Amount (₹)</label>
-                      <input type="number" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.rentAmount} onChange={e => setNewShop({...newShop, rentAmount: e.target.value})} />
-                  </div>
-                  <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">Owner Full Name</label>
-                      <input type="text" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.ownerName} onChange={e => setNewShop({...newShop, ownerName: e.target.value})} />
-                  </div>
-                  <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">Owner Email</label>
-                      <input type="email" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.ownerEmail} onChange={e => setNewShop({...newShop, ownerEmail: e.target.value})} />
-                  </div>
-                  <div className="space-y-1">
-                      <label className="text-sm font-medium text-gray-700">Temporary Password</label>
-                      <input type="password" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.password} onChange={e => setNewShop({...newShop, password: e.target.value})} />
-                  </div>
-                  <div className="md:col-span-2 flex justify-end mt-2">
-                      <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium shadow transition">
-                          Create Shop
-                      </button>
-                  </div>
-              </form>
-          </Card>
-      )}
+      {activeTab === 'analytics' ? (
+          <AdminAnalytics />
+      ) : (
+          <>
+            {isCreating && (
+                <Card className="p-6 border-l-4 border-blue-500">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">Register New Shop & Owner</h2>
+                    <form onSubmit={handleCreateShop} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-gray-700">Shop Name</label>
+                            <input type="text" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.shopName} onChange={e => setNewShop({...newShop, shopName: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-gray-700">Monthly Rent Amount (₹)</label>
+                            <input type="number" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.rentAmount} onChange={e => setNewShop({...newShop, rentAmount: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-gray-700">Owner Full Name</label>
+                            <input type="text" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.ownerName} onChange={e => setNewShop({...newShop, ownerName: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-gray-700">Owner Email</label>
+                            <input type="email" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.ownerEmail} onChange={e => setNewShop({...newShop, ownerEmail: e.target.value})} />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-sm font-medium text-gray-700">Temporary Password</label>
+                            <input type="password" required className="w-full border p-2 rounded focus:ring-1 focus:ring-blue-500 outline-none" value={newShop.password} onChange={e => setNewShop({...newShop, password: e.target.value})} />
+                        </div>
+                        <div className="md:col-span-2 flex justify-end mt-2">
+                            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium shadow transition">
+                                Create Shop
+                            </button>
+                        </div>
+                    </form>
+                </Card>
+            )}
+            {/* The rest of the original dashboard content goes here... */}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="p-6 flex items-center">
@@ -161,12 +173,12 @@ const AdminDashboard = () => {
           </div>
         </Card>
         <Card className="p-6 flex items-center">
-          <div className="p-4 bg-purple-100 rounded-xl mr-5">
-            <DollarSign className="h-8 w-8 text-purple-600" />
+          <div className="p-4 bg-red-100 rounded-xl mr-5">
+            <AlertCircle className="h-8 w-8 text-red-600" />
           </div>
           <div>
-            <p className="text-sm font-medium text-gray-500">Rent Collected</p>
-            <p className="text-2xl font-bold text-gray-800">₹{rentCollected.toLocaleString('en-IN')}</p>
+            <p className="text-sm font-medium text-gray-500">Total Arrears (Due)</p>
+            <p className="text-2xl font-bold text-gray-800">₹{totalArrears.toLocaleString('en-IN')}</p>
           </div>
         </Card>
       </div>
@@ -187,30 +199,33 @@ const AdminDashboard = () => {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {shops.map(shop => (
-                  <tr key={shop._id} className="hover:bg-gray-50 transition">
+                  <tr key={shop.id} className="hover:bg-gray-50 transition">
                     <td className="py-4 font-medium text-gray-800">{shop.name}</td>
-                    <td className="py-4 text-gray-600 break-all">{shop.owner_id?.name || 'Unknown'}</td>
+                    <td className="py-4 text-gray-600 break-all">{shop.User?.name || 'Unknown'}</td>
                     <td className="py-4">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${shop.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                         {shop.status.toUpperCase()}
                       </span>
                     </td>
                     <td className="py-4">
-                      <div className="text-gray-800 font-medium">₹{shop.rent_amount.toLocaleString('en-IN')}</div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold mt-1 inline-block ${shop.rent_status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                        {shop.rent_status}
+                      <div className="text-gray-800 font-medium">₹{(shop.total_balance || 0).toLocaleString('en-IN')}</div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-semibold mt-1 inline-block ${shop.total_balance <= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {shop.total_balance <= 0 ? 'Paid' : 'Pending Arrears'}
                       </span>
+                      <div className="text-[10px] text-gray-400 mt-0.5">Base: ₹{shop.rent_amount}</div>
                     </td>
                     <td className="py-4 text-right">
                         <div className="flex justify-end items-center gap-2 mt-1">
+                            {shop.total_balance > 0 && (
+                                <button 
+                                    onClick={() => handlePayment(shop.id, shop.total_balance)}
+                                    className="text-xs px-2 py-1 rounded font-medium transition border border-green-200 text-green-700 hover:bg-green-50"
+                                >
+                                    Clear Balance
+                                </button>
+                            )}
                             <button 
-                                onClick={() => toggleRentStatus(shop._id, shop.rent_status)}
-                                className={`text-xs px-2 py-1 rounded font-medium transition border ${shop.rent_status === 'Paid' ? 'border-yellow-200 text-yellow-700 hover:bg-yellow-50' : 'border-green-200 text-green-700 hover:bg-green-50'}`}
-                            >
-                                {shop.rent_status === 'Paid' ? 'Revoke Rent' : 'Mark Paid'}
-                            </button>
-                            <button 
-                                onClick={() => handleDeleteShop(shop._id)}
+                                onClick={() => handleDeleteShop(shop.id)}
                                 className="p-1 text-red-500 hover:text-red-700 transition hover:bg-red-50 rounded"
                             >
                                 <Trash2 className="h-4 w-4" />
@@ -236,9 +251,12 @@ const AdminDashboard = () => {
             {pendingRentShops.length > 0 ? (
               <ul className="space-y-3">
                 {pendingRentShops.map(shop => (
-                  <li key={shop._id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
-                    <span className="font-medium text-red-800">{shop.name}</span>
-                    <span className="text-red-600 font-bold">₹{shop.rent_amount.toLocaleString('en-IN')}</span>
+                  <li key={shop.id} className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
+                    <div>
+                        <p className="font-medium text-red-800">{shop.name}</p>
+                        <p className="text-[10px] text-red-600">Last Billed: {shop.last_billed_month || 'N/A'}</p>
+                    </div>
+                    <span className="text-red-600 font-bold">₹{shop.total_balance.toLocaleString('en-IN')}</span>
                   </li>
                 ))}
               </ul>
@@ -254,7 +272,7 @@ const AdminDashboard = () => {
             </h2>
             <ul className="space-y-3">
               {topShops.length > 0 ? topShops.map((shop, idx) => (
-                <li key={shop._id} className="flex items-center p-2 hover:bg-gray-50 rounded-lg transition">
+                <li key={shop.id} className="flex items-center p-2 hover:bg-gray-50 rounded-lg transition">
                   <div className="h-8 w-8 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center font-bold mr-3 shadow-sm">
                     {idx + 1}
                   </div>
@@ -270,6 +288,8 @@ const AdminDashboard = () => {
           </Card>
         </div>
       </div>
+          </>
+      )}
     </div>
   );
 };

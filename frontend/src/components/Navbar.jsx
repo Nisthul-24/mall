@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Store, LogOut, LogIn } from 'lucide-react';
+import NotificationCenter from './NotificationCenter';
+
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -24,6 +26,7 @@ const Navbar = () => {
           <div className="flex items-center space-x-4">
             {user ? (
               <>
+                <NotificationCenter />
                 <span className="text-sm text-gray-600">Hello, {user.name} ({user.role})</span>
                 {user.role === 'shop_owner' && (
                   <Link to="/shop-dashboard" className="flex items-center text-gray-600 hover:text-blue-600">
