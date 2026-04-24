@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Heart } from 'lucide-react';
 
-const WishlistButton = ({ productId, initialIsWishlisted = false }) => {
+const WishlistButton = ({ productId, initialIsWishlisted = false, onToggle }) => {
     const [isWishlisted, setIsWishlisted] = useState(initialIsWishlisted);
     const [loading, setLoading] = useState(false);
     const token = localStorage.getItem('token');
@@ -29,6 +29,7 @@ const WishlistButton = ({ productId, initialIsWishlisted = false }) => {
                 });
                 setIsWishlisted(true);
             }
+            if (onToggle) onToggle();
         } catch (err) {
             console.error('Wishlist toggle failed:', err);
         } finally {

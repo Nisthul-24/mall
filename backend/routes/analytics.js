@@ -36,22 +36,21 @@ router.get('/admin-overview', adminAuth, async (req, res) => {
         const { rows: monthlyProfit } = await pool.query(monthlyProfitQuery);
 
         // 4. Rent Prediction (Expected Revenue Next Month)
-        // Logic: Total Base Rent + (Predicted Performance Bonus based on current month's sales)
-        const currentMonth = new Date().toISOString().slice(0, 7);
+        // Logic: Total Base Rent
         const predictionQuery = `
-            SELECT 
-                SUM(rent_amount) AS total_base_rent,
-                SUM(COALESCE(sub.monthly_sales, 0) * performance_rate) AS predicted_bonus
-            FROM shops s
-            LEFT JOIN (
-                SELECT p.shop_id, SUM(p.price * sa.quantity_sold) AS monthly_sales
-                FROM sales sa
-                JOIN products p ON sa.product_id = p.id
-                WHERE TO_CHAR(sa.date, 'YYYY-MM') = $1
-                GROUP BY p.shop_id
-            ) sub ON s.id = sub.shop_id
+            SELECT SUM(rent_amount) AS total_base_rent
+            FROM shops
         `;
-        const { rows: prediction } = await pool.query(predictionQuery, [currentMonth]);
+        const { rows: prediction } = await pool.query(predictionQuery);
+
+        // 5. Total Rent Collected in Current Month
+        const currentMonth = new Date().toISOString().slice(0, 7);
+        const collectedRentQuery = `
+            SELECT SUM(last_cleared_amount) AS total_collected
+            FROM shops
+            WHERE TO_CHAR(last_cleared_date, 'YYYY-MM') = $1
+        `;
+        const { rows: collectedRent } = await pool.query(collectedRentQuery, [currentMonth]);
 
         res.json({
             shopRevenue,
@@ -59,9 +58,9 @@ router.get('/admin-overview', adminAuth, async (req, res) => {
             monthlyProfit,
             prediction: {
                 totalBaseRent: parseFloat(prediction[0].total_base_rent || 0),
-                predictedBonus: parseFloat(prediction[0].predicted_bonus || 0),
-                expectedTotal: parseFloat(prediction[0].total_base_rent || 0) + parseFloat(prediction[0].predicted_bonus || 0)
-            }
+                expectedTotal: parseFloat(prediction[0].total_base_rent || 0)
+            },
+            collectedRentCurrentMonth: parseFloat(collectedRent[0].total_collected || 0)
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

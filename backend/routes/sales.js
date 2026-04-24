@@ -44,7 +44,8 @@ router.get('/shop/:shopId', async (req, res) => {
         const query = `
             SELECT s.*, 
                    p.name AS "Product_name", 
-                   p.price AS "Product_price"
+                   p.price AS "Product_price",
+                   p.cost_price AS "Product_cost_price"
             FROM sales s
             JOIN products p ON s.product_id = p.id
             WHERE p.shop_id = $1
@@ -59,7 +60,8 @@ router.get('/shop/:shopId', async (req, res) => {
             product_id: row.product_id,
             Product: {
                 name: row.Product_name,
-                price: row.Product_price
+                price: row.Product_price,
+                cost_price: row.Product_cost_price || 0
             }
         }));
 

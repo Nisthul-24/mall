@@ -11,8 +11,11 @@ const CustomerView = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [recentlyViewed, setRecentlyViewed] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [modalTab, setModalTab] = useState('details');
   const [search, setSearch] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
+  const [wishlistProductIds, setWishlistProductIds] = useState([]);
+  const [showWishlistOnly, setShowWishlistOnly] = useState(false);
   
   const token = localStorage.getItem('token');
   const user = JSON.parse(localStorage.getItem('user'));
@@ -21,7 +24,10 @@ const CustomerView = () => {
   useEffect(() => {
     fetchData();
     fetchCategories();
-    if (user) fetchRecentlyViewed();
+    if (user) {
+        fetchRecentlyViewed();
+        fetchWishlist();
+    }
   }, [selectedCategory]);
 
   const fetchData = async () => {
@@ -59,6 +65,15 @@ const CustomerView = () => {
     }
   };
 
+  const fetchWishlist = async () => {
+      try {
+          const res = await axios.get('http://localhost:5000/api/wishlist', authHeader);
+          setWishlistProductIds(res.data.map(item => item.id));
+      } catch (err) {
+          console.error(err);
+      }
+  };
+
   const trackView = async (productId) => {
     if (!user) return;
     try {
@@ -77,16 +92,18 @@ const CustomerView = () => {
   const filteredProducts = products.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase());
     const matchPrice = maxPrice ? p.price <= Number(maxPrice) : true;
-    return matchSearch && matchPrice;
+    const matchWishlist = showWishlistOnly ? wishlistProductIds.includes(p.id) : true;
+    return matchSearch && matchPrice && matchWishlist;
   });
 
   const clearFilters = () => {
       setSearch('');
       setMaxPrice('');
       setSelectedCategory('All');
+      setShowWishlistOnly(false);
   };
 
-  const hasFilters = search.length > 0 || maxPrice.length > 0 || selectedCategory !== 'All';
+  const hasFilters = search.length > 0 || maxPrice.length > 0 || selectedCategory !== 'All' || showWishlistOnly;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -111,6 +128,15 @@ const CustomerView = () => {
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value)}
             />
+            {user && (
+                <button 
+                    onClick={() => setShowWishlistOnly(!showWishlistOnly)}
+                    className={`px-4 py-2 rounded-lg flex items-center transition border ${showWishlistOnly ? 'bg-red-50 border-red-200 text-red-600 shadow-inner' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                >
+                    <Heart className={`h-4 w-4 md:mr-1 ${showWishlistOnly ? 'fill-current' : ''}`} /> 
+                    <span className="hidden md:inline">{showWishlistOnly ? 'Wishlisted' : 'Wishlist'}</span>
+                </button>
+            )}
             {hasFilters && (
                 <button 
                     onClick={clearFilters}
@@ -151,14 +177,18 @@ const CustomerView = () => {
           return (
             <Card key={product.id} className="relative hover:shadow-lg transition flex flex-col overflow-hidden group border-none ring-1 ring-gray-100">
               <div className="absolute top-2 right-2 z-10">
-                <WishlistButton productId={product.id} />
+                <WishlistButton 
+                    productId={product.id} 
+                    initialIsWishlisted={wishlistProductIds.includes(product.id)} 
+                    onToggle={fetchWishlist}
+                />
               </div>
               {isCheapest && (
                 <div className="absolute z-10 top-0 left-0 bg-yellow-400 text-[10px] text-yellow-900 font-black px-2 py-1 rounded-br-lg uppercase tracking-wider">
                   Best Price
                 </div>
               )}
-              <div className="h-48 bg-gray-50 w-full relative cursor-pointer" onClick={() => { trackView(product.id); setSelectedProduct(product); }}>
+              <div className="h-48 bg-gray-50 w-full relative cursor-pointer" onClick={() => { trackView(product.id); setSelectedProduct(product); setModalTab('details'); }}>
                 {product.image_url ? (
                   <img src={product.image_url} alt={product.name} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 ) : (
@@ -168,7 +198,7 @@ const CustomerView = () => {
                   </div>
                 )}
               </div>
-              <div className="p-5 flex-grow flex flex-col cursor-pointer" onClick={() => { trackView(product.id); setSelectedProduct(product); }}>
+              <div className="p-5 flex-grow flex flex-col cursor-pointer" onClick={() => { trackView(product.id); setSelectedProduct(product); setModalTab('details'); }}>
                 <div className="text-[10px] uppercase font-bold text-blue-500 mb-1">{product.category}</div>
                 <h3 className="font-bold text-gray-800 line-clamp-1 group-hover:text-blue-600 transition-colors">{product.name}</h3>
                 <p className="text-xl font-bold text-gray-900 my-2">₹{product.price.toLocaleString('en-IN')}</p>
@@ -179,12 +209,15 @@ const CustomerView = () => {
                       <span className="truncate">{product.Shop?.name || 'Unknown Shop'}</span>
                   </div>
 
-                  <div className="flex items-center">
+                  <div 
+                    className="flex items-center hover:bg-gray-100 p-1 rounded -ml-1 transition"
+                    onClick={(e) => { e.stopPropagation(); trackView(product.id); setSelectedProduct(product); setModalTab('reviews'); }}
+                  >
                     <div className="flex text-yellow-400">
                         <Star className="h-3.5 w-3.5 fill-current" />
                     </div>
-                    <span className="ml-1 text-xs font-bold text-gray-700">{avgRating}</span>
-                    <span className="ml-1 text-[10px] text-gray-400 font-medium">(Verified)</span>
+                    <span className="ml-1 text-xs font-bold text-gray-700">{avgRating > 0 ? avgRating.toFixed(1) : 0}</span>
+                    <span className="ml-1 text-[10px] text-gray-400 font-medium">({product.rating_count || 0})</span>
                   </div>
                 </div>
 
@@ -202,6 +235,7 @@ const CustomerView = () => {
           product={selectedProduct} 
           isOpen={!!selectedProduct} 
           onClose={() => setSelectedProduct(null)} 
+          initialTab={modalTab}
       />
 
       {user && recentlyViewed.length > 0 && (

@@ -14,7 +14,7 @@ import {
     Title 
 } from 'chart.js';
 import Card from '../components/Card';
-import { TrendingUp, PieChart, BarChart, Target } from 'lucide-react';
+import { TrendingUp, PieChart, BarChart, Target, DollarSign } from 'lucide-react';
 
 ChartJS.register(
     ArcElement, 
@@ -87,14 +87,21 @@ const AdminAnalytics = () => {
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <Card className="p-6 bg-gradient-to-br from-blue-600 to-blue-700 text-white">
-                    <Target className="h-8 w-8 mb-4 opacity-80" />
-                    <p className="text-sm font-medium opacity-80">Next Month Potential</p>
-                    <p className="text-2xl font-bold">₹{data.prediction.expectedTotal.toLocaleString('en-IN')}</p>
-                    <div className="mt-2 text-xs opacity-70">
-                        Base: ₹{data.prediction.totalBaseRent.toLocaleString('en-IN')} + Bonus: ₹{data.prediction.predictedBonus.toLocaleString('en-IN')}
-                    </div>
-                </Card>
+                <div className="flex flex-col gap-6">
+                    <Card className="p-6 bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+                        <Target className="h-8 w-8 mb-4 opacity-80" />
+                        <p className="text-sm font-medium opacity-80">Next Month Potential</p>
+                        <p className="text-2xl font-bold">₹{data.prediction.expectedTotal.toLocaleString('en-IN')}</p>
+                        <div className="mt-2 text-xs opacity-70">
+                            Base Rent Only
+                        </div>
+                    </Card>
+                    <Card className="p-6 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white flex-1">
+                        <DollarSign className="h-8 w-8 mb-4 opacity-80" />
+                        <p className="text-sm font-medium opacity-80">Rent Collected (This Month)</p>
+                        <p className="text-2xl font-bold">₹{(data.collectedRentCurrentMonth || 0).toLocaleString('en-IN')}</p>
+                    </Card>
+                </div>
                 <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Card className="p-6">
                         <div className="flex items-center gap-2 mb-4">

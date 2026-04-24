@@ -22,6 +22,7 @@ router.get('/', async (req, res) => {
             rent_status: row.rent_status,
             rent_amount: row.rent_amount,
             total_balance: row.total_balance,
+            last_cleared_amount: row.last_cleared_amount,
             last_billed_month: row.last_billed_month,
             rating: row.rating,
             User: {
@@ -81,8 +82,8 @@ router.post('/pay/:id', shopOwnerAuth, async (req, res) => {
         const newStatus = newBalance === 0 ? 'Paid' : 'Pending';
 
         const { rows } = await pool.query(
-            'UPDATE shops SET total_balance = $1, rent_status = $2 WHERE id = $3 RETURNING *',
-            [newBalance, newStatus, req.params.id]
+            'UPDATE shops SET total_balance = $1, rent_status = $2, last_cleared_amount = $3, last_cleared_date = NOW() WHERE id = $4 RETURNING *',
+            [newBalance, newStatus, currentShop[0].total_balance, req.params.id]
         );
 
         // Add notification for the payment

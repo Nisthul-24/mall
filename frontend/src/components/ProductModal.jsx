@@ -1,23 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { X, Star, ImageIcon, Send, Clock, User } from 'lucide-react';
+import { X, Star, ImageIcon, Send, Clock, User, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import Card from './Card';
 
-const ProductModal = ({ product, isOpen, onClose }) => {
+const ProductModal = ({ product, isOpen, onClose, initialTab = 'details' }) => {
+    const [tab, setTab] = useState(initialTab);
     const [reviews, setReviews] = useState([]);
     const [newReview, setNewReview] = useState({ score: 5, comment: '', image_url: '' });
     const [submitting, setSubmitting] = useState(false);
     const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user'));
 
     useEffect(() => {
         if (isOpen && product) {
+            setTab(initialTab);
             fetchReviews();
         }
-    }, [isOpen, product]);
+    }, [isOpen, product, initialTab]);
 
     const fetchReviews = async () => {
         try {
-            const res = await axios.get(`http://localhost:5000/api/reviews/product/${product.id}`);
+            const res = await axios.get(`http://localhost:5000/api/reviews/product/${product.id}${user ? `?userId=${user.id}` : ''}`);
             setReviews(res.data);
         } catch (err) {
             console.error(err);
@@ -43,6 +46,31 @@ const ProductModal = ({ product, isOpen, onClose }) => {
             alert('Failed to submit review');
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleDeleteReview = async () => {
+        if (!window.confirm('Are you sure you want to delete your review?')) return;
+        try {
+            await axios.delete(`http://localhost:5000/api/reviews/product/${product.id}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchReviews();
+        } catch (err) {
+            alert('Failed to delete review');
+        }
+    };
+
+    const handleVote = async (reviewId, voteType, currentVote) => {
+        if (!token) return alert('Login required to vote');
+        const newVote = currentVote === voteType ? 0 : voteType;
+        try {
+            await axios.post(`http://localhost:5000/api/reviews/${reviewId}/vote`, { vote_type: newVote }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchReviews();
+        } catch (err) {
+            alert('Failed to record vote');
         }
     };
 
@@ -75,12 +103,22 @@ const ProductModal = ({ product, isOpen, onClose }) => {
                         </div>
                     </div>
 
+                    <div className="flex gap-4 border-b mb-6">
+                        <button onClick={() => setTab('details')} className={`pb-2 text-sm font-bold transition border-b-2 ${tab === 'details' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Details</button>
+                        <button onClick={() => setTab('reviews')} className={`pb-2 text-sm font-bold transition border-b-2 ${tab === 'reviews' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>Reviews</button>
+                    </div>
+
+                    {tab === 'details' ? (
+                        <div className="text-gray-600 text-sm leading-relaxed whitespace-pre-wrap flex-grow">
+                            {product.description || 'No description available for this product.'}
+                        </div>
+                    ) : (
                     <div className="space-y-6 flex-grow">
                         {/* Review Form */}
                         {token && (
                             <form onSubmit={handleSubmitReview} className="p-4 bg-gray-50 rounded-xl space-y-4 border border-gray-100">
                                 <div className="flex justify-between items-center">
-                                    <h4 className="font-bold text-gray-800">Add Review</h4>
+                                    <h4 className="font-bold text-gray-800">Rate & Review Item</h4>
                                     <div className="flex gap-1">
                                         {[1,2,3,4,5].map(s => (
                                             <Star 
@@ -93,8 +131,7 @@ const ProductModal = ({ product, isOpen, onClose }) => {
                                 </div>
                                 <textarea 
                                     className="w-full border rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition h-20"
-                                    placeholder="Write your feedback..."
-                                    required
+                                    placeholder="Write your feedback (optional)..."
                                     value={newReview.comment}
                                     onChange={e => setNewReview({...newReview, comment: e.target.value})}
                                 />
@@ -124,20 +161,43 @@ const ProductModal = ({ product, isOpen, onClose }) => {
                             {reviews.length > 0 ? reviews.map(rev => (
                                 <div key={rev.id} className="space-y-2 py-2 border-b last:border-0 border-gray-100">
                                     <div className="flex justify-between items-center">
-                                        <span className="font-bold text-gray-800 text-sm">{rev.user_name}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-gray-800 text-sm">{rev.user_name}</span>
+                                            {user && rev.user_id === user.id && (
+                                                <button onClick={handleDeleteReview} className="text-red-500 hover:text-red-700 p-1 bg-red-50 hover:bg-red-100 rounded transition" title="Delete Review">
+                                                    <Trash2 className="h-3 w-3" />
+                                                </button>
+                                            )}
+                                        </div>
                                         <div className="flex gap-0.5 text-yellow-400">
                                             {[...Array(rev.score)].map((_, i) => <Star key={i} className="h-3 w-3 fill-current" />)}
                                         </div>
                                     </div>
-                                    <p className="text-sm text-gray-600 leading-relaxed italic">"{rev.comment}"</p>
+                                    {rev.comment ? (
+                                        <p className="text-sm text-gray-600 leading-relaxed italic">"{rev.comment}"</p>
+                                    ) : (
+                                        <p className="text-sm text-gray-400 italic">Rated {rev.score} stars</p>
+                                    )}
                                     {rev.review_image_url && (
                                         <div className="h-24 w-24 rounded-lg overflow-hidden border">
                                             <img src={rev.review_image_url} alt="Review" className="h-full w-full object-cover" />
                                         </div>
                                     )}
-                                    <div className="flex items-center text-[10px] text-gray-400 gap-1 mt-1">
-                                        <Clock className="h-3 w-3" />
-                                        {new Date(rev.created_at).toLocaleDateString()}
+                                    <div className="flex items-center justify-between mt-1">
+                                        <div className="flex items-center text-[10px] text-gray-400 gap-1">
+                                            <Clock className="h-3 w-3" />
+                                            {new Date(rev.createdAt).toLocaleDateString()}
+                                        </div>
+                                        {(!user || rev.user_id !== user?.id) && (
+                                            <div className="flex gap-3 text-xs text-gray-500">
+                                                <button onClick={() => handleVote(rev.id, 1, rev.user_vote)} className={`flex items-center gap-1 transition ${rev.user_vote === 1 ? 'text-blue-600' : 'hover:text-blue-600'}`}>
+                                                    <ThumbsUp className={`h-3.5 w-3.5 ${rev.user_vote === 1 ? 'fill-current' : ''}`} /> {rev.helpful_count || 0}
+                                                </button>
+                                                <button onClick={() => handleVote(rev.id, -1, rev.user_vote)} className={`flex items-center gap-1 transition ${rev.user_vote === -1 ? 'text-red-600' : 'hover:text-red-600'}`}>
+                                                    <ThumbsDown className={`h-3.5 w-3.5 ${rev.user_vote === -1 ? 'fill-current' : ''}`} /> {rev.not_helpful_count || 0}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )) : (
@@ -145,6 +205,7 @@ const ProductModal = ({ product, isOpen, onClose }) => {
                             )}
                         </div>
                     </div>
+                    )}
                 </div>
             </div>
         </div>

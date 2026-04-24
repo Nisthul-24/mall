@@ -27,19 +27,9 @@ const runBillingSync = async () => {
         const { rows: admins } = await client.query("SELECT id FROM users WHERE role = 'admin'");
 
         for (const shop of shopsToBill) {
-            // Calculate Performance Bonus based on previous month sales
-            const { rows: salesData } = await client.query(`
-                SELECT SUM(p.price * sa.quantity_sold) AS total_sales
-                FROM sales sa
-                JOIN products p ON sa.product_id = p.id
-                WHERE p.shop_id = $1 AND TO_CHAR(sa.date, 'YYYY-MM') = $2
-            `, [shop.id, prevMonth]);
+            const totalRentForMonth = shop.rent_amount;
 
-            const monthlySales = parseFloat(salesData[0].total_sales || 0);
-            const performanceBonus = monthlySales * (shop.performance_rate || 0.05);
-            const totalRentForMonth = shop.rent_amount + performanceBonus;
-
-            console.log(`💵 Billing shop: ${shop.name} (Base: ₹${shop.rent_amount} + Performance: ₹${performanceBonus.toFixed(2)})`);
+            console.log(`💵 Billing shop: ${shop.name} (Base: ₹${shop.rent_amount})`);
             
             // Increment balance and update billed month
             await client.query(`
@@ -54,7 +44,7 @@ const runBillingSync = async () => {
             await client.query(`
                 INSERT INTO notifications (user_id, message, type)
                 VALUES ($1, $2, 'rent_due')
-            `, [shop.owner_id, `Monthly rent of ₹${totalRentForMonth.toFixed(2)} billed (includes performance bonus of ₹${performanceBonus.toFixed(2)}).`]);
+            `, [shop.owner_id, `Monthly rent of ₹${totalRentForMonth.toFixed(2)} billed.`]);
 
             // Notify all admins
             for (const admin of admins) {

@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 import Card from '../components/Card';
-import { Package, DollarSign, TrendingUp, AlertTriangle, Plus, Trash2, Edit2, X, CreditCard } from 'lucide-react';
+import { Package, DollarSign, TrendingUp, AlertTriangle, Plus, Trash2, Edit2, X, CreditCard, Wallet, CheckCircle, ShoppingCart } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -16,7 +16,7 @@ const ShopDashboard = () => {
   const token = localStorage.getItem('token');
   const authHeader = { headers: { Authorization: `Bearer ${token}` } };
   
-   const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity: '', image_url: '', category: 'General' });
+   const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity: '', image_url: '', category: 'General', description: '', cost_price: '' });
 
   useEffect(() => {
     fetchShopData();
@@ -69,7 +69,7 @@ const ShopDashboard = () => {
       } else {
         await axios.post('http://localhost:5000/api/products', { ...newProduct, shop_id: shop.id }, authHeader);
       }
-      setNewProduct({ name: '', price: '', quantity: '', image_url: '', category: 'General' });
+      setNewProduct({ name: '', price: '', quantity: '', image_url: '', category: 'General', description: '', cost_price: '' });
       setEditingId(null);
       fetchShopData();
     } catch (err) {
@@ -84,13 +84,15 @@ const ShopDashboard = () => {
         price: product.price,
         quantity: product.quantity,
         image_url: product.image_url || '',
-        category: product.category || 'General'
+        category: product.category || 'General',
+        description: product.description || '',
+        cost_price: product.cost_price || ''
     });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setNewProduct({ name: '', price: '', quantity: '', image_url: '', category: 'General' });
+    setNewProduct({ name: '', price: '', quantity: '', image_url: '', category: 'General', description: '', cost_price: '' });
   };
 
   const handleDeleteProduct = async (id) => {
@@ -103,11 +105,29 @@ const ShopDashboard = () => {
     }
   };
 
+  const handleMarkSold = async (product) => {
+    if (product.quantity < 1) return alert('Out of stock!');
+    try {
+      await axios.post('http://localhost:5000/api/sales', {
+        product_id: product.id,
+        quantity_sold: 1
+      }, authHeader);
+      fetchShopData();
+    } catch (err) {
+      alert('Failed to mark sold: ' + (err.response?.data?.message || err.message));
+    }
+  };
+
   // Aggregating Sales Data for Chart
   const salesByProduct = {};
+  const profitByProduct = {};
   sales.forEach(sale => {
     const pName = sale.Product?.name || 'Unknown';
     salesByProduct[pName] = (salesByProduct[pName] || 0) + sale.quantity_sold;
+    
+    const cost = sale.Product?.cost_price || 0;
+    const profitPerItem = (sale.Product?.price || 0) - cost;
+    profitByProduct[pName] = (profitByProduct[pName] || 0) + (profitPerItem * sale.quantity_sold);
   });
 
   const chartData = {
@@ -117,15 +137,35 @@ const ShopDashboard = () => {
         label: 'Items Sold',
         data: Object.values(salesByProduct),
         backgroundColor: 'rgba(59, 130, 246, 0.6)',
+        yAxisID: 'y',
+      },
+      {
+        label: 'Profit (₹)',
+        data: Object.values(profitByProduct),
+        backgroundColor: 'rgba(16, 185, 129, 0.6)',
+        yAxisID: 'y1',
       }
     ]
+  };
+
+  const chartOptions = {
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      y: { type: 'linear', display: true, position: 'left', title: { display: true, text: 'Items Sold' } },
+      y1: { type: 'linear', display: true, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: 'Profit (₹)' } }
+    }
   };
 
   const lowStock = products.filter(p => p.quantity < 5);
   if (!shop) return <div className="text-center p-8 mt-10">No shop registered to this owner.</div>;
 
   const totalRevenue = sales.reduce((acc, sale) => acc + (sale.quantity_sold * (sale.Product?.price || 0)), 0);
-  const performanceBonus = totalRevenue * (shop.performance_rate || 0.05);
+  const totalProfit = sales.reduce((acc, sale) => {
+    const cost = sale.Product?.cost_price || 0;
+    const profitPerItem = (sale.Product?.price || 0) - cost;
+    return acc + (profitPerItem * sale.quantity_sold);
+  }, 0);
 
   return (
     <div className="space-y-6">
@@ -142,31 +182,35 @@ const ShopDashboard = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="p-4 flex items-center">
           <div className="p-3 bg-blue-100 rounded-lg mr-4"><DollarSign className="h-6 w-6 text-blue-600" /></div>
-          <div><p className="text-sm text-gray-500">Total Revenue</p><p className="text-xl font-bold text-gray-800">₹{totalRevenue.toLocaleString('en-IN')}</p></div>
+          <div><p className="text-sm text-gray-500">Revenue</p><p className="text-xl font-bold text-gray-800">₹{totalRevenue.toLocaleString('en-IN')}</p></div>
+        </Card>
+        <Card className="p-4 flex items-center">
+          <div className="p-3 bg-emerald-100 rounded-lg mr-4"><Wallet className="h-6 w-6 text-emerald-600" /></div>
+          <div><p className="text-sm text-gray-500">Profit</p><p className="text-xl font-bold text-gray-800">₹{totalProfit.toLocaleString('en-IN')}</p></div>
         </Card>
         <Card className="p-4 flex items-center">
           <div className="p-3 bg-green-100 rounded-lg mr-4"><Package className="h-6 w-6 text-green-600" /></div>
-          <div><p className="text-sm text-gray-500">Total Products</p><p className="text-xl font-bold text-gray-800">{products.length}</p></div>
+          <div><p className="text-sm text-gray-500">Products</p><p className="text-xl font-bold text-gray-800">{products.length}</p></div>
         </Card>
         <Card className="p-4 flex items-center">
           <div className="p-3 bg-purple-100 rounded-lg mr-4"><TrendingUp className="h-6 w-6 text-purple-600" /></div>
-          <div><p className="text-sm text-gray-500">Total Sales</p><p className="text-xl font-bold text-gray-800">{sales.length}</p></div>
+          <div><p className="text-sm text-gray-500">Sales</p><p className="text-xl font-bold text-gray-800">{sales.length}</p></div>
         </Card>
-        <Card className="p-4 flex items-center relative overflow-hidden">
+        <Card className="p-4 flex items-center relative overflow-hidden col-span-2 lg:col-span-1">
           {shop.total_balance > 0 && <div className="absolute top-0 right-0 h-16 w-16 bg-red-500/10 rotate-45 translate-x-8 -translate-y-8"></div>}
           <div className="p-3 bg-red-100 rounded-lg mr-4"><CreditCard className="h-6 w-6 text-red-600" /></div>
           <div className="flex-1">
             <p className="text-sm text-gray-500">Rent Balance</p>
             <p className="text-xl font-bold text-red-600">₹{(shop.total_balance || 0).toLocaleString('en-IN')}</p>
             <div className="text-[9px] text-gray-400 font-medium mt-1 uppercase">
-                Base: ₹{shop.rent_amount} + Performance Bonus: ₹{performanceBonus.toFixed(0)}
+                Base Rent: ₹{shop.rent_amount}
             </div>
           </div>
           {shop.total_balance > 0 && (
-            <button onClick={handlePayment} className="text-[10px] bg-red-600 text-white px-2 py-1.5 rounded font-bold hover:bg-red-700 transition shadow-sm z-10">PAY NOW</button>
+            <button onClick={handlePayment} className="text-[10px] bg-red-600 text-white px-2 py-1.5 rounded font-bold hover:bg-red-700 transition shadow-sm z-10 ml-2">PAY</button>
           )}
         </Card>
       </div>
@@ -185,11 +229,13 @@ const ShopDashboard = () => {
                 <option value="Books">Books</option>
                 <option value="Food">Food</option>
             </select>
-            <input type="number" placeholder="Price" required className="px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} />
+            <input type="number" placeholder="Price (₹)" required className="px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.price} onChange={e => setNewProduct({...newProduct, price: e.target.value})} />
+            <input type="number" placeholder="Cost (₹)" required className="px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.cost_price} onChange={e => setNewProduct({...newProduct, cost_price: e.target.value})} />
             <input type="number" placeholder="Qty" required className="px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.quantity} onChange={e => setNewProduct({...newProduct, quantity: e.target.value})} />
             <input type="url" placeholder="Image URL" className="px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.image_url} onChange={e => setNewProduct({...newProduct, image_url: e.target.value})} />
+            <input type="text" placeholder="Basic Description (optional)" className="col-span-2 md:col-span-6 px-3 py-2 border rounded outline-none focus:ring-1 focus:ring-blue-500 text-sm" value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} />
             
-            <div className="col-span-2 md:col-span-1 flex gap-2">
+            <div className="col-span-2 md:col-span-6 flex gap-2">
                 <button type="submit" className={`flex-1 text-white font-bold rounded flex items-center justify-center py-2 transition shadow-sm ${editingId ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-blue-600 hover:bg-blue-700'}`}>
                     {editingId ? <CheckCircle className="h-5 w-5" /> : <><Plus className="h-4 w-4 mr-1" /> Add</>}
                 </button>
@@ -220,8 +266,9 @@ const ShopDashboard = () => {
                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${p.quantity < 5 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>{p.quantity}</span>
                     </td>
                     <td className="py-2 flex justify-end gap-2">
-                      <button onClick={() => handleEditInit(p)} className="text-blue-500 hover:text-blue-700 p-1"><Edit2 className="h-4 w-4" /></button>
-                      <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1"><Trash2 className="h-4 w-4" /></button>
+                      <button onClick={() => handleMarkSold(p)} disabled={p.quantity < 1} className="text-emerald-500 hover:text-emerald-700 p-1 disabled:opacity-50" title="Sell 1 Item"><ShoppingCart className="h-4 w-4" /></button>
+                      <button onClick={() => handleEditInit(p)} className="text-blue-500 hover:text-blue-700 p-1" title="Edit"><Edit2 className="h-4 w-4" /></button>
+                      <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:text-red-700 p-1" title="Delete"><Trash2 className="h-4 w-4" /></button>
                     </td>
                   </tr>
                 ))}
@@ -232,9 +279,9 @@ const ShopDashboard = () => {
 
         <div className="space-y-6">
           <Card className="p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Sales Analytics</h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">Sales & Profit Analytics</h2>
             <div className="h-48">
-              {sales.length > 0 ? <Bar data={chartData} options={{ maintainAspectRatio: false }} /> : <p className="text-gray-500 text-center mt-16 text-sm">No sales data available</p>}
+              {sales.length > 0 ? <Bar data={chartData} options={chartOptions} /> : <p className="text-gray-500 text-center mt-16 text-sm">No sales data available</p>}
             </div>
           </Card>
 

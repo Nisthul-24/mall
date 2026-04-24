@@ -11,7 +11,8 @@ router.get('/', async (req, res) => {
             SELECT p.*, 
                    s.id AS "Shop_id", 
                    s.name AS "Shop_name", 
-                   s.status AS "Shop_status"
+                   s.status AS "Shop_status",
+                   (SELECT COUNT(*) FROM reviews WHERE product_id = p.id) AS rating_count
             FROM products p
             LEFT JOIN shops s ON p.shop_id = s.id
         `;
@@ -31,7 +32,9 @@ router.get('/', async (req, res) => {
             quantity: row.quantity,
             category: row.category,
             image_url: row.image_url,
+            description: row.description,
             average_rating: row.average_rating,
+            rating_count: parseInt(row.rating_count) || 0,
             shop_id: row.shop_id,
             Shop: {
                 id: row.Shop_id,
@@ -87,18 +90,46 @@ router.get('/shop/:shopId', async (req, res) => {
 // ─── CREATE PRODUCT (Shop Owner only) ─────────────────────────────────────────
 router.post('/', shopOwnerAuth, async (req, res) => {
     try {
-        const { name, price, quantity, image_url, shop_id, category } = req.body;
+        const { name, price, quantity, image_url, shop_id, category, description, cost_price } = req.body;
         const query = `
-            INSERT INTO products (name, price, quantity, image_url, shop_id, category, average_rating)
-            VALUES ($1, $2, $3, $4, $5, $6, 0)
+            INSERT INTO products (name, price, quantity, image_url, shop_id, category, description, cost_price, average_rating)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 0)
             RETURNING *
         `;
-        const { rows } = await pool.query(query, [name, price, quantity, image_url || '', shop_id, category || 'General']);
+        const { rows } = await pool.query(query, [name, price, quantity, image_url || '', shop_id, category || 'General', description || '', cost_price || 0]);
         res.status(201).json(rows[0]);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-module.exports = router;
+// ─── UPDATE PRODUCT (Shop Owner only) ─────────────────────────────────────────
+router.put('/:id', shopOwnerAuth, async (req, res) => {
+    try {
+        const { name, price, quantity, image_url, category, description, cost_price } = req.body;
+        const query = `
+            UPDATE products 
+            SET name = $1, price = $2, quantity = $3, image_url = $4, category = $5, description = $6, cost_price = $7, "updatedAt" = NOW()
+            WHERE id = $8
+            RETURNING *
+        `;
+        const { rows } = await pool.query(query, [name, price, quantity, image_url || '', category || 'General', description || '', cost_price || 0, req.params.id]);
+        if (rows.length === 0) return res.status(404).json({ message: 'Product not found' });
+        res.json(rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
+// ─── DELETE PRODUCT (Shop Owner only) ─────────────────────────────────────────
+router.delete('/:id', shopOwnerAuth, async (req, res) => {
+    try {
+        const { rowCount } = await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
+        if (rowCount === 0) return res.status(404).json({ message: 'Product not found' });
+        res.json({ message: 'Product deleted' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+module.exports = router;

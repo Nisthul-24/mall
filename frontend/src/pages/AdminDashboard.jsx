@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Card from '../components/Card';
-import { Store, CheckCircle, AlertCircle, DollarSign, Trash2, Plus, PieChart, Layout } from 'lucide-react';
+import { Store, CheckCircle, AlertCircle, DollarSign, Trash2, Plus, PieChart, Layout, RotateCcw } from 'lucide-react';
 import AdminAnalytics from '../components/AdminAnalytics';
 
 const AdminDashboard = () => {
@@ -41,6 +41,22 @@ const AdminDashboard = () => {
       if(err.response?.status === 401 || err.response?.status === 403) navigate('/login');
       alert('Payment failed: ' + (err.response?.data?.message || err.message));
     }
+  };
+
+  const handleUndoClear = async (shop) => {
+      if (!shop.last_cleared_amount || shop.last_cleared_amount <= 0) return;
+      try {
+          await axios.put(`http://localhost:5000/api/shops/${shop.id}`, {
+              total_balance: shop.last_cleared_amount,
+              rent_status: 'Pending',
+              last_cleared_amount: 0,
+              last_cleared_date: null
+          }, authHeader);
+          
+          fetchShops();
+      } catch (err) {
+          alert('Failed to undo: ' + (err.response?.data?.message || err.message));
+      }
   };
 
   const handleDeleteShop = async (shopId) => {
@@ -216,14 +232,22 @@ const AdminDashboard = () => {
                     </td>
                     <td className="py-4 text-right">
                         <div className="flex justify-end items-center gap-2 mt-1">
-                            {shop.total_balance > 0 && (
+                            {shop.total_balance > 0 ? (
                                 <button 
                                     onClick={() => handlePayment(shop.id, shop.total_balance)}
                                     className="text-xs px-2 py-1 rounded font-medium transition border border-green-200 text-green-700 hover:bg-green-50"
                                 >
                                     Clear Balance
                                 </button>
-                            )}
+                            ) : shop.last_cleared_amount > 0 ? (
+                                <button 
+                                    onClick={() => handleUndoClear(shop)}
+                                    className="text-xs px-2 py-1 rounded font-medium transition border border-orange-200 text-orange-700 hover:bg-orange-50 flex items-center"
+                                    title="Undo Clear Balance"
+                                >
+                                    <RotateCcw className="h-3 w-3 mr-1" /> Undo
+                                </button>
+                            ) : null}
                             <button 
                                 onClick={() => handleDeleteShop(shop.id)}
                                 className="p-1 text-red-500 hover:text-red-700 transition hover:bg-red-50 rounded"
