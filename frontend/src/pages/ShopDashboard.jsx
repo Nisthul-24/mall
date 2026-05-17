@@ -24,15 +24,15 @@ const ShopDashboard = () => {
 
   const fetchShopData = async () => {
     try {
-      const shopRes = await axios.get(`http://localhost:5000/api/shops/owner/${user.id}`, authHeader);
+      const shopRes = await axios.get(`/api/shops/owner/${user.id}`, authHeader);
       const shopData = shopRes.data;
       setShop(shopData);
       
       if (shopData) {
-        const prodRes = await axios.get(`http://localhost:5000/api/products/shop/${shopData.id}`);
+        const prodRes = await axios.get(`/api/products/shop/${shopData.id}`);
         setProducts(prodRes.data);
         
-        const salesRes = await axios.get(`http://localhost:5000/api/sales/shop/${shopData.id}`);
+        const salesRes = await axios.get(`/api/sales/shop/${shopData.id}`);
         setSales(salesRes.data);
       }
     } catch (err) {
@@ -43,7 +43,7 @@ const ShopDashboard = () => {
   const toggleShopStatus = async () => {
     try {
       const newStatus = shop.status === 'open' ? 'closed' : 'open';
-      const res = await axios.put(`http://localhost:5000/api/shops/${shop.id}`, { status: newStatus }, authHeader);
+      const res = await axios.put(`/api/shops/${shop.id}`, { status: newStatus }, authHeader);
       setShop(res.data);
     } catch (err) {
       console.error(err);
@@ -53,7 +53,7 @@ const ShopDashboard = () => {
   const handlePayment = async () => {
     if (!shop.total_balance || shop.total_balance <= 0) return;
     try {
-        await axios.post(`http://localhost:5000/api/shops/pay/${shop.id}`, { amount: shop.total_balance }, authHeader);
+        await axios.post(`/api/shops/pay/${shop.id}`, { amount: shop.total_balance }, authHeader);
         fetchShopData();
         alert('Rent paid successfully!');
     } catch (err) {
@@ -65,9 +65,9 @@ const ShopDashboard = () => {
     e.preventDefault();
     try {
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/products/${editingId}`, newProduct, authHeader);
+        await axios.put(`/api/products/${editingId}`, newProduct, authHeader);
       } else {
-        await axios.post('http://localhost:5000/api/products', { ...newProduct, shop_id: shop.id }, authHeader);
+        await axios.post('/api/products', { ...newProduct, shop_id: shop.id }, authHeader);
       }
       setNewProduct({ name: '', price: '', quantity: '', image_url: '', category: 'General', description: '', cost_price: '' });
       setEditingId(null);
@@ -98,7 +98,7 @@ const ShopDashboard = () => {
   const handleDeleteProduct = async (id) => {
     if(!window.confirm('Are you sure you want to delete this product?')) return;
     try {
-      await axios.delete(`http://localhost:5000/api/products/${id}`, authHeader);
+      await axios.delete(`/api/products/${id}`, authHeader);
       fetchShopData();
     } catch (err) {
       console.error(err);
@@ -108,7 +108,7 @@ const ShopDashboard = () => {
   const handleMarkSold = async (product) => {
     if (product.quantity < 1) return alert('Out of stock!');
     try {
-      await axios.post('http://localhost:5000/api/sales', {
+      await axios.post('/api/sales', {
         product_id: product.id,
         quantity_sold: 1
       }, authHeader);

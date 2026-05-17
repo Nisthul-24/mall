@@ -20,7 +20,7 @@ const ProductModal = ({ product, isOpen, onClose, initialTab = 'details' }) => {
 
     const fetchReviews = async () => {
         try {
-            const res = await axios.get(`http://localhost:5000/api/reviews/product/${product.id}${user ? `?userId=${user.id}` : ''}`);
+            const res = await axios.get(`/api/reviews/product/${product.id}${user ? `?userId=${user.id}` : ''}`);
             setReviews(res.data);
         } catch (err) {
             console.error(err);
@@ -32,7 +32,7 @@ const ProductModal = ({ product, isOpen, onClose, initialTab = 'details' }) => {
         if (!token) return alert('Login required to review');
         setSubmitting(true);
         try {
-            await axios.post('http://localhost:5000/api/reviews', {
+            await axios.post('/api/reviews', {
                 product_id: product.id,
                 score: newReview.score,
                 comment: newReview.comment,
@@ -52,7 +52,7 @@ const ProductModal = ({ product, isOpen, onClose, initialTab = 'details' }) => {
     const handleDeleteReview = async () => {
         if (!window.confirm('Are you sure you want to delete your review?')) return;
         try {
-            await axios.delete(`http://localhost:5000/api/reviews/product/${product.id}`, {
+            await axios.delete(`/api/reviews/product/${product.id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchReviews();
@@ -65,7 +65,7 @@ const ProductModal = ({ product, isOpen, onClose, initialTab = 'details' }) => {
         if (!token) return alert('Login required to vote');
         const newVote = currentVote === voteType ? 0 : voteType;
         try {
-            await axios.post(`http://localhost:5000/api/reviews/${reviewId}/vote`, { vote_type: newVote }, {
+            await axios.post(`/api/reviews/${reviewId}/vote`, { vote_type: newVote }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             fetchReviews();

@@ -27,7 +27,7 @@ const AdminDashboard = () => {
 
   const fetchShops = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/shops');
+      const res = await axios.get('/api/shops');
       setShops(res.data);
     } catch (err) {
       console.error(err);
@@ -35,7 +35,7 @@ const AdminDashboard = () => {
   };
   const handlePayment = async (shopId, amount) => {
     try {
-      await axios.post(`http://localhost:5000/api/shops/pay/${shopId}`, { amount }, authHeader);
+      await axios.post(`/api/shops/pay/${shopId}`, { amount }, authHeader);
       fetchShops(); 
     } catch (err) {
       if(err.response?.status === 401 || err.response?.status === 403) navigate('/login');
@@ -46,7 +46,7 @@ const AdminDashboard = () => {
   const handleUndoClear = async (shop) => {
       if (!shop.last_cleared_amount || shop.last_cleared_amount <= 0) return;
       try {
-          await axios.put(`http://localhost:5000/api/shops/${shop.id}`, {
+          await axios.put(`/api/shops/${shop.id}`, {
               total_balance: shop.last_cleared_amount,
               rent_status: 'Pending',
               last_cleared_amount: 0,
@@ -62,7 +62,7 @@ const AdminDashboard = () => {
   const handleDeleteShop = async (shopId) => {
       if(!window.confirm('Are you sure you want to delete this shop entirely?')) return;
       try {
-          await axios.delete(`http://localhost:5000/api/shops/${shopId}`, authHeader);
+          await axios.delete(`/api/shops/${shopId}`, authHeader);
           fetchShops();
       } catch (err) {
           console.error(err);
@@ -72,14 +72,14 @@ const AdminDashboard = () => {
   const handleCreateShop = async (e) => {
       e.preventDefault();
       try {
-          const userRes = await axios.post('http://localhost:5000/api/auth/register', {
+          const userRes = await axios.post('/api/auth/register', {
               name: newShop.ownerName,
               email: newShop.ownerEmail,
               password: newShop.password,
               role: 'shop_owner'
           });
           const createdUserId = userRes.data.user.id;
-          await axios.post('http://localhost:5000/api/shops', {
+          await axios.post('/api/shops', {
               name: newShop.shopName,
               owner_id: createdUserId,
               rent_amount: Number(newShop.rentAmount),

@@ -19,12 +19,12 @@ const WishlistButton = ({ productId, initialIsWishlisted = false, onToggle }) =>
         setLoading(true);
         try {
             if (isWishlisted) {
-                await axios.delete(`http://localhost:5000/api/wishlist/${productId}`, {
+                await axios.delete(`/api/wishlist/${productId}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setIsWishlisted(false);
             } else {
-                await axios.post(`http://localhost:5000/api/wishlist/${productId}`, {}, {
+                await axios.post(`/api/wishlist/${productId}`, {}, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setIsWishlisted(true);

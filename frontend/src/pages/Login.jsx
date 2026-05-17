@@ -22,18 +22,18 @@ const Login = () => {
     
     try {
       if (isRegister) {
-        await axios.post('http://localhost:5000/api/auth/register', { 
+        await axios.post('/api/auth/register', { 
             name, email, password, role: 'customer' 
         });
         
-        const loginRes = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+        const loginRes = await axios.post('/api/auth/login', { email, password });
         localStorage.setItem('token', loginRes.data.token);
         localStorage.setItem('user', JSON.stringify(loginRes.data.user));
         
         navigate('/');
         window.location.reload();
       } else {
-        const response = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+        const response = await axios.post('/api/auth/login', { email, password });
         localStorage.setItem('token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
         

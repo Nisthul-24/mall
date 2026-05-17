@@ -33,10 +33,10 @@ const CustomerView = () => {
   const fetchData = async () => {
     try {
       const url = selectedCategory === 'All' 
-        ? 'http://localhost:5000/api/products' 
-        : `http://localhost:5000/api/products?category=${selectedCategory}`;
+        ? '/api/products' 
+        : `/api/products?category=${selectedCategory}`;
       const prodRes = await axios.get(url);
-      const shopRes = await axios.get('http://localhost:5000/api/shops');
+      const shopRes = await axios.get('/api/shops');
       
       const openShopIds = shopRes.data.filter(s => s.status === 'open').map(s => s.id);
       const availableProducts = prodRes.data.filter(p => openShopIds.includes(p.shop_id?.id || p.shop_id));
@@ -49,7 +49,7 @@ const CustomerView = () => {
 
   const fetchCategories = async () => {
     try {
-        const res = await axios.get('http://localhost:5000/api/products/categories');
+        const res = await axios.get('/api/products/categories');
         setCategories(['All', ...res.data]);
     } catch (err) {
         console.error(err);
@@ -58,7 +58,7 @@ const CustomerView = () => {
 
   const fetchRecentlyViewed = async () => {
     try {
-        const res = await axios.get('http://localhost:5000/api/history', authHeader);
+        const res = await axios.get('/api/history', authHeader);
         setRecentlyViewed(res.data);
     } catch (err) {
         console.error(err);
@@ -67,7 +67,7 @@ const CustomerView = () => {
 
   const fetchWishlist = async () => {
       try {
-          const res = await axios.get('http://localhost:5000/api/wishlist', authHeader);
+          const res = await axios.get('/api/wishlist', authHeader);
           setWishlistProductIds(res.data.map(item => item.id));
       } catch (err) {
           console.error(err);
@@ -77,7 +77,7 @@ const CustomerView = () => {
   const trackView = async (productId) => {
     if (!user) return;
     try {
-        await axios.post(`http://localhost:5000/api/history/${productId}`, {}, authHeader);
+        await axios.post(`/api/history/${productId}`, {}, authHeader);
     } catch (err) {
         console.error(err);
     }

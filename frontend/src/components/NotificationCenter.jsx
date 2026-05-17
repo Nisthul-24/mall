@@ -10,7 +10,7 @@ const NotificationCenter = () => {
     const fetchNotifications = async () => {
         if (!token) return;
         try {
-            const res = await axios.get('http://localhost:5000/api/notifications', {
+            const res = await axios.get('/api/notifications', {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setNotifications(res.data);
@@ -27,7 +27,7 @@ const NotificationCenter = () => {
 
     const markAsRead = async (id) => {
         try {
-            await axios.put(`http://localhost:5000/api/notifications/${id}/read`, {}, {
+            await axios.put(`/api/notifications/${id}/read`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setNotifications(notifications.map(n => n.id === id ? { ...n, is_read: true } : n));
@@ -38,7 +38,7 @@ const NotificationCenter = () => {
 
     const markAllAsRead = async () => {
         try {
-            await axios.put('http://localhost:5000/api/notifications/read-all', {}, {
+            await axios.put('/api/notifications/read-all', {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setNotifications(notifications.map(n => ({ ...n, is_read: true })));
